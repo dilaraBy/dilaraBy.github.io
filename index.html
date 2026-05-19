@@ -229,6 +229,7 @@ section { padding: clamp(72px, 12vw, 128px) 0; scroll-margin-top: 72px; }
   position: relative;
   margin-top: 6px;
   isolation: isolate;
+  width: 243px;
 }
 .hero-portrait img {
   width: 100%;
@@ -626,6 +627,8 @@ footer {
     grid-template-columns: 1fr;
     gap: 12px;
   }
+  .hero-portrait { display: block; width: 160px; }
+  .hero-portrait::before { display: none; }
   .hero-meta { flex-direction: row; padding-top: 0; margin-bottom: 8px; }
   .project { grid-template-columns: 1fr; gap: 10px; padding: 24px 0; }
   .project .arrow { display: none; }
@@ -833,7 +836,7 @@ footer {
         </a>
       </div>
     </div>
-    <figure class="hero-portrait fade-in" style="width: 243px">
+    <figure class="hero-portrait fade-in">
       <img src="assets/avatar.jpg" alt="Portrait of Dilara Bayram" />
       <figcaption class="cap">
         <span>Dilara Bayram</span>
