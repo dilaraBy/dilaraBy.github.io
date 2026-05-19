@@ -627,8 +627,9 @@ footer {
     grid-template-columns: 1fr;
     gap: 12px;
   }
-  .hero-portrait { display: block; width: 160px; }
+  .hero-portrait { display: block; width: 160px; order: 1; }
   .hero-portrait::before { display: none; }
+  .hero-content { order: 2; }
   .hero-meta { flex-direction: row; padding-top: 0; margin-bottom: 8px; }
   .project { grid-template-columns: 1fr; gap: 10px; padding: 24px 0; }
   .project .arrow { display: none; }
@@ -815,7 +816,7 @@ footer {
       <div>Coventry, UK</div>
       <div class="status"><span class="status-dot"></span>Open to roles from September 2026</div>
     </div>
-    <div>
+    <div class="hero-content">
       <h1 class="fade-in">Dilara Bayram, <em>MSc Applied AI · Warwick.</em></h1>
       <div class="hero-actions fade-in">
         <button class="btn primary" data-cal-link="dilarabyrm" data-cal-config='{"layout":"month_view"}'>
