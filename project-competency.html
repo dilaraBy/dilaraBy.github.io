@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Competency intelligence platform · Dilara Bayram</title>
+<meta name="description" content="An NLP pipeline that reads 1,000+ job descriptions with BERT and semantic similarity, then ships a competency map into a PowerApps + SharePoint platform HR actually pilots." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #FAF8F4; --ink: #1A1A1A; --muted: #6B6B68; --faint: #A9A7A1;
+  --hairline: #E5E2DB; --card: #F3F0E9;
+  --accent: oklch(0.58 0.09 45); --accent-soft: oklch(0.58 0.09 45 / 0.14);
+  --serif: "Instrument Serif", Georgia, serif;
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, Menlo, monospace;
+  --maxw: 1120px; --gutter: clamp(20px, 5vw, 56px);
+}
+html[data-theme="dark"] {
+  --paper: #111110; --ink: #EDEBE6; --muted: #8A8885; --faint: #5A5854;
+  --hairline: #26241F; --card: #181714;
+  --accent: oklch(0.72 0.09 45); --accent-soft: oklch(0.72 0.09 45 / 0.16);
+}
+* { box-sizing: border-box; }
+body { margin:0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; transition: background-color .35s, color .35s; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter); }
+
+/* nav */
+.nav { position: sticky; top: 0; z-index: 50; background: color-mix(in oklch, var(--paper) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--hairline); }
+.nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.mark { font-family: var(--serif); font-size: 22px; letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
+.mark .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; transform: translateY(-2px); }
+.nav-right { display: flex; gap: 8px; align-items: center; }
+.back { font-size: 14px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--hairline); }
+.back:hover { color: var(--ink); border-color: var(--ink); }
+.back svg { width: 14px; height: 14px; }
+.theme-toggle { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--hairline); border-radius: 999px; background: transparent; color: var(--ink); }
+.theme-toggle:hover { border-color: var(--ink); }
+.theme-toggle svg { width: 16px; height: 16px; }
+
+/* header */
+.doc-head { padding: clamp(56px, 10vw, 112px) 0 48px; border-bottom: 1px solid var(--hairline); }
+.crumb { display: flex; gap: 14px; align-items: center; font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.04em; margin-bottom: 28px; }
+.crumb .sep { opacity: 0.5; }
+.doc-title { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 6vw, 68px); letter-spacing: -0.02em; line-height: 1.05; margin: 0 0 20px; max-width: 22ch; }
+.doc-title em { font-style: italic; color: var(--muted); }
+.doc-tagline { font-size: 18px; color: var(--muted); max-width: 60ch; margin: 0 0 40px; text-wrap: pretty; }
+.doc-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+.doc-meta dt { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin-bottom: 6px; }
+.doc-meta dd { margin: 0; font-size: 14px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 3px 9px; border: 1px solid var(--hairline); border-radius: 999px; }
+.links { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 7px 12px; border: 1px solid var(--hairline); border-radius: 999px; color: var(--ink); background: transparent; }
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn svg { width: 12px; height: 12px; }
+
+/* metric strip */
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; margin-top: 48px; }
+.metric-card { background: var(--paper); padding: 22px 20px; }
+.metric-val { font-family: var(--serif); font-size: 36px; line-height: 1; letter-spacing: -0.015em; display: block; color: var(--ink); }
+.metric-val em { font-style: italic; color: var(--accent); }
+.metric-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; display: block; margin-top: 10px; }
+
+/* body */
+.doc-body { display: grid; grid-template-columns: 220px 1fr; gap: 64px; padding: 80px 0 96px; }
+.toc { position: sticky; top: 88px; align-self: start; font-size: 13px; }
+.toc h5 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 14px; }
+.toc a { display: block; padding: 6px 0; color: var(--muted); border-left: 1px solid var(--hairline); padding-left: 14px; transition: color .2s, border-color .2s; }
+.toc a.active, .toc a:hover { color: var(--ink); border-color: var(--ink); }
+
+.prose { max-width: 64ch; }
+.prose h2 {
+  font-family: var(--serif); font-weight: 400; font-size: 32px; letter-spacing: -0.015em;
+  margin: 56px 0 16px; line-height: 1.15; scroll-margin-top: 88px;
+}
+.prose h2:first-child { margin-top: 0; }
+.prose h2 .num { font-family: var(--mono); font-size: 12px; color: var(--faint); display: block; letter-spacing: 0.04em; margin-bottom: 6px; }
+.prose p { font-size: 17px; line-height: 1.7; margin: 0 0 18px; color: var(--ink); text-wrap: pretty; }
+.prose p.lead { font-family: var(--serif); font-size: 22px; line-height: 1.45; color: var(--muted); margin-bottom: 24px; }
+.prose ul { padding-left: 18px; margin: 0 0 18px; }
+.prose li { margin-bottom: 8px; }
+.prose b, .prose strong { font-weight: 500; color: var(--ink); }
+.prose figure { margin: 32px 0; }
+.prose figure img { width: 100%; display: block; border: 1px solid var(--hairline); border-radius: 4px; background: var(--card); }
+.prose figure .placeholder {
+  aspect-ratio: 16/9; border: 1px solid var(--hairline); background:
+    repeating-linear-gradient(45deg, var(--hairline) 0 1px, transparent 1px 10px),
+    var(--card);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.06em;
+  border-radius: 4px; text-align: center; padding: 16px;
+}
+.prose figure figcaption { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.04em; margin-top: 10px; }
+
+.callout {
+  border: 1px solid var(--hairline); padding: 20px 22px; border-radius: 4px;
+  background: var(--card); margin: 28px 0;
+}
+.callout h6 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 8px; }
+.callout p { margin: 0; font-size: 15px; }
+.callout p + p { margin-top: 10px; }
+
+/* decision table */
+.dec-table { border-top: 1px solid var(--hairline); margin: 24px 0; }
+.dec-row { display: grid; grid-template-columns: 160px 1fr; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--hairline); align-items: start; }
+.dec-row .k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--faint); padding-top: 3px; }
+.dec-row .v { font-size: 15px; line-height: 1.55; }
+.dec-row .v b { font-weight: 500; }
+
+/* phases (numbered, like the layered diagram but horizontal-leaning) */
+.phases { display: flex; flex-direction: column; gap: 6px; margin: 24px 0 32px; }
+.phase {
+  display: grid; grid-template-columns: 56px 1fr;
+  gap: 18px; padding: 18px 20px;
+  border: 1px solid var(--hairline); border-radius: 4px;
+  background: var(--paper); align-items: baseline;
+}
+.phase .pn { font-family: var(--serif); font-size: 30px; line-height: 1; color: var(--accent); font-style: italic; letter-spacing: -0.02em; }
+.phase .pc b { display: block; font-family: var(--serif); font-size: 20px; font-weight: 400; letter-spacing: -0.01em; margin-bottom: 4px; color: var(--ink); }
+.phase .pc span { color: var(--muted); font-size: 15px; line-height: 1.55; }
+
+/* competency categories */
+.cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; margin: 24px 0 32px; }
+.cat { background: var(--paper); padding: 18px 20px; }
+.cat .ct { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; margin-bottom: 8px; }
+.cat .ch { font-family: var(--serif); font-size: 22px; letter-spacing: -0.01em; margin-bottom: 6px; color: var(--ink); }
+.cat .cd { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.cat.core { border-top: 3px solid var(--accent); }
+
+/* outcomes */
+.outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); margin: 32px 0; }
+.outcome { background: var(--paper); padding: 24px; }
+.outcome .n { font-family: var(--serif); font-size: 44px; letter-spacing: -0.02em; color: var(--ink); line-height: 1; }
+.outcome .n em { font-style: italic; color: var(--accent); }
+.outcome .l { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin-top: 8px; }
+
+/* next */
+.next { border-top: 1px solid var(--hairline); padding: 56px 0 80px; }
+.next h3 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 16px; }
+.next-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.next-card { border: 1px solid var(--hairline); padding: 24px; border-radius: 4px; transition: border-color .2s, background .2s; display: block; }
+.next-card:hover { border-color: var(--ink); background: var(--card); }
+.next-card .dir { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-bottom: 10px; letter-spacing: 0.06em; }
+.next-card h4 { font-family: var(--serif); font-weight: 400; font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.next-card p { margin: 0; font-size: 14px; color: var(--muted); }
+
+footer { border-top: 1px solid var(--hairline); padding: 40px 0 48px; font-size: 13px; color: var(--muted); }
+.footer-inner { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+
+@media (max-width: 880px) {
+  .doc-body { grid-template-columns: 1fr; gap: 32px; }
+  .toc { position: static; }
+  .doc-meta { grid-template-columns: repeat(2, 1fr); }
+  .metrics-row { grid-template-columns: repeat(2, 1fr); }
+  .dec-row { grid-template-columns: 1fr; gap: 4px; }
+  .phase { grid-template-columns: 40px 1fr; gap: 12px; padding: 14px 16px; }
+  .phase .pn { font-size: 24px; }
+  .cats { grid-template-columns: 1fr; }
+  .outcomes { grid-template-columns: 1fr; }
+  .next-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a href="index.html" class="mark">Dilara Bayram<span class="dot"></span></a>
+    <div class="nav-right">
+      <a class="back" href="index.html#projects">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 18l-6-6 6-6"/></svg>
+        All work
+      </a>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg id="sunIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="doc-head">
+    <div class="wrap">
+      <div class="crumb">
+        <span>Case study</span><span class="sep">/</span><span>2025</span><span class="sep">/</span><span>bsc thesis · mercedes-benz türk</span>
+      </div>
+      <h1 class="doc-title">Competency intelligence, <em>learned from a thousand job descriptions.</em></h1>
+      <p class="doc-tagline">An NLP pipeline that reads unstructured job postings with BERT-based extraction and semantic similarity, builds a three-tier competency taxonomy, and ships it into a SharePoint and PowerApps platform that HR pilots for workforce planning.</p>
+
+      <dl class="doc-meta">
+        <div>
+          <dt>Role</dt>
+          <dd>Co-designed with Zeynep Ezgi Akyüz. Led NLP pipeline, data strategy, platform architecture.</dd>
+        </div>
+        <div>
+          <dt>Context</dt>
+          <dd>BSc Industrial Engineering thesis · ITU + Mercedes-Benz Türk, 2025</dd>
+        </div>
+        <div>
+          <dt>Stack</dt>
+          <dd><div class="pills"><span class="pill">python</span><span class="pill">bert ner</span><span class="pill">jobbert</span><span class="pill">powerapps</span><span class="pill">sharepoint</span></div></dd>
+        </div>
+        <div>
+          <dt>Supervisor</dt>
+          <dd>Asst. Prof. Erkan Işıklı · ITU</dd>
+        </div>
+      </dl>
+
+      <div class="metrics-row">
+        <div class="metric-card">
+          <span class="metric-val"><em>1,000+</em></span>
+          <span class="metric-label">Job descriptions processed</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val">3</span>
+          <span class="metric-label">Competency tiers · core / leadership / functional</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val">1</span>
+          <span class="metric-label">Pilot department · strategic HR</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val">0</span>
+          <span class="metric-label">New software licenses required</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="doc-body wrap">
+    <aside class="toc" id="toc">
+      <h5>on this page</h5>
+      <a href="#problem" class="active">Problem</a>
+      <a href="#approach">Approach</a>
+      <a href="#decisions">Key decisions</a>
+      <a href="#challenges">Challenges</a>
+      <a href="#outcome">Outcome</a>
+      <a href="#reflection">What I'd do differently</a>
+    </aside>
+
+    <article class="prose">
+      <h2 id="problem"><span class="num">01</span>The problem</h2>
+      <p class="lead">HR processes were being run subjectively, manager by manager, with no shared language and no platform underneath.</p>
+      <p>Mercedes-Benz Türk had no standardised competency model. Recruitment, performance management, succession planning: each was driven by the mental model of whichever manager happened to be in the room. The data existed, scattered across HRIS systems, role libraries, and informal documents, but it could not be queried. Earlier attempts at a competency model had not stuck, mostly because they were neither self-updating nor integrated into daily HR workflows. A PDF that becomes obsolete the week it is published is not a system, it is a snapshot.</p>
+      <p>The recurring theme in early conversations was simple: the data existed, but nobody had time to read and structure it manually.</p>
+
+      <figure>
+        <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border:1px solid var(--hairline);border-radius:4px;background:var(--card);font-family:'Geist Mono',ui-monospace,Menlo,monospace;" aria-label="Before and after workflow comparison">
+          <!-- BEFORE column -->
+          <rect x="12" y="12" width="350" height="196" rx="4" fill="var(--paper,#FAF8F4)" stroke="var(--hairline,#E5E2DB)" stroke-width="1"/>
+          <text x="187" y="34" font-size="10" fill="var(--faint,#A9A7A1)" text-anchor="middle" letter-spacing="0.08em">BEFORE</text>
+          <!-- before steps -->
+          <g fill="var(--paper,#FAF8F4)" stroke="var(--hairline,#E5E2DB)" stroke-width="1">
+            <rect x="32" y="44" width="310" height="30" rx="3"/>
+            <rect x="32" y="84" width="310" height="30" rx="3"/>
+            <rect x="32" y="124" width="310" height="30" rx="3"/>
+            <rect x="32" y="164" width="310" height="30" rx="3"/>
+          </g>
+          <g fill="var(--muted,#6B6B68)" font-size="10" text-anchor="middle">
+            <text x="187" y="64">Yearly review cycle kicked off</text>
+            <text x="187" y="104">HR managers read JDs manually (weeks)</text>
+            <text x="187" y="144">Each manager uses their own language</text>
+            <text x="187" y="184">Static PDF — obsolete within weeks</text>
+          </g>
+          <!-- AFTER column -->
+          <rect x="398" y="12" width="350" height="196" rx="4" fill="var(--paper,#FAF8F4)" stroke="var(--accent,#B8754A)" stroke-width="1"/>
+          <text x="573" y="34" font-size="10" fill="var(--accent,#B8754A)" text-anchor="middle" letter-spacing="0.08em">AFTER</text>
+          <!-- after steps -->
+          <g fill="var(--paper,#FAF8F4)" stroke="var(--hairline,#E5E2DB)" stroke-width="1">
+            <rect x="418" y="44" width="310" height="30" rx="3"/>
+            <rect x="418" y="84" width="310" height="30" rx="3"/>
+            <rect x="418" y="124" width="310" height="30" rx="3"/>
+            <rect x="418" y="164" width="310" height="30" rx="3"/>
+          </g>
+          <g fill="var(--ink,#1A1A1A)" font-size="10" text-anchor="middle">
+            <text x="573" y="64">New job posting lands in SharePoint</text>
+            <text x="573" y="104">BERT pipeline extracts competencies (minutes)</text>
+            <text x="573" y="144">Shared taxonomy — one language, one map</text>
+            <text x="573" y="184">Live PowerApps explorer — refreshes on demand</text>
+          </g>
+          <!-- arrow between columns -->
+          <line x1="365" y1="110" x2="393" y2="110" stroke="var(--accent,#B8754A)" stroke-width="1.5"/>
+          <polygon points="393,107 397,110 393,113" fill="var(--accent,#B8754A)"/>
+          <!-- review time callout -->
+          <text x="379" y="130" font-size="9" fill="var(--accent,#B8754A)" text-anchor="middle">−62%</text>
+          <text x="379" y="142" font-size="8" fill="var(--faint,#A9A7A1)" text-anchor="middle">review time</text>
+        </svg>
+        <figcaption>Fig. 0. Workflow before and after. The change is less about adding AI and more about removing the document-review bottleneck — from a yearly snapshot to an on-demand map.</figcaption>
+      </figure>
+
+      <h2 id="approach"><span class="num">02</span>Approach</h2>
+      <p>The project ran in four phases. Each one was designed to produce an artefact a human could audit before the next one started, so the model was never the only thing carrying the result.</p>
+
+      <div class="phases">
+        <div class="phase">
+          <span class="pn">01</span>
+          <span class="pc"><b>Stakeholder discovery</b><span>Interviews with HR managers in the pilot department, process mapping of existing recruitment and review cycles, HRIS system review, and a catalogue of current job titles and functions to anchor the corpus to a real organisation.</span></span>
+        </div>
+        <div class="phase">
+          <span class="pn">02</span>
+          <span class="pc"><b>Data collection</b><span>Internal job descriptions, the O*NET database, and over 1,000 comparable LinkedIn postings for the same roles, cross-referenced against industry benchmarks. External postings gave the language; internal documents gave the truth.</span></span>
+        </div>
+        <div class="phase">
+          <span class="pn">03</span>
+          <span class="pc"><b>NLP pipeline</b><span>BERT-based Named Entity Recognition to extract competency terms from raw text, semantic similarity validation with JobBERT and all-MiniLM to match extracted terms against a curated taxonomy, TF-IDF to weight role-specific importance, and a three-way categorisation into Core, Leadership / Managerial, and Functional competencies.</span></span>
+        </div>
+        <div class="phase">
+          <span class="pn">04</span>
+          <span class="pc"><b>Digital platform</b><span>PowerApps front-end on SharePoint, with Microsoft Lists driving the explorer screens. Not the exciting choice, but the one HR could own after I left.</span></span>
+        </div>
+      </div>
+
+      <p>The output of phase three is the taxonomy you see on the platform. Three tiers, defined explicitly so HR and line managers point to the same words:</p>
+
+      <div class="cats">
+        <div class="cat core">
+          <div class="ct">Tier 01</div>
+          <div class="ch">Core</div>
+          <div class="cd">Applies to every role in the company. Communication, accountability, learning agility.</div>
+        </div>
+        <div class="cat">
+          <div class="ct">Tier 02</div>
+          <div class="ch">Leadership / Managerial</div>
+          <div class="cd">Applies to people management and director tracks. Stakeholder management, strategic planning, coaching.</div>
+        </div>
+        <div class="cat">
+          <div class="ct">Tier 03</div>
+          <div class="ch">Functional</div>
+          <div class="cd">Role-specific technical skills. Defined per family and refreshed against the live corpus rather than written once and forgotten.</div>
+        </div>
+      </div>
+
+      <h2 id="decisions"><span class="num">03</span>Key decisions</h2>
+      <p>Three choices mattered more than any individual modelling step:</p>
+      <div class="dec-table">
+        <div class="dec-row">
+          <div class="k">Power Platform, not custom</div>
+          <div class="v"><b>Shipping is a governance decision.</b> The company already had M365 licenses and Microsoft Lists in production. A standalone app would have required IT procurement, data-governance approval, and end-user training. Building inside the existing stack collapsed the deployment cost to roughly zero, which is the only way an HR-led pilot ever gets out of the door.</div>
+        </div>
+        <div class="dec-row">
+          <div class="k">BERT-NER, not keywords</div>
+          <div class="v"><b>Job descriptions phrase the same competency many ways.</b> "Stakeholder management," "managing stakeholder expectations," and "cross-functional communication" all describe the same skill. Rule-based keyword matching misses the equivalence; BERT's contextual representations let semantic similarity do the work that no static dictionary can.</div>
+        </div>
+        <div class="dec-row">
+          <div class="k">HR as the pilot</div>
+          <div class="v"><b>End user and pilot department in the same room.</b> Tight feedback loops, weekly iterations on the taxonomy with the people who would actually use it. Rolling the platform out across all departments at once would have taken years and risked low adoption if the model needed adjustment, which it always does at the start.</div>
+        </div>
+        <div class="dec-row">
+          <div class="k">Three-way taxonomy</div>
+          <div class="v"><b>One bucket is a list. Two buckets is a filter. Three buckets is a model.</b> Core / Leadership / Functional gave us enough resolution to talk about a role meaningfully without inviting an argument about every borderline phrase.</div>
+        </div>
+      </div>
+
+      <figure>
+        <svg viewBox="0 0 760 190" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border:1px solid var(--hairline);border-radius:4px;background:var(--card);font-family:'Geist Mono',ui-monospace,Menlo,monospace;" aria-label="NLP pipeline diagram: corpus to PowerApps">
+          <!-- boxes -->
+          <g fill="var(--paper,#FAF8F4)" stroke="var(--hairline,#E5E2DB)" stroke-width="1">
+            <rect x="12"  y="65" width="100" height="60" rx="3"/>
+            <rect x="132" y="65" width="100" height="60" rx="3"/>
+            <rect x="252" y="65" width="100" height="60" rx="3"/>
+            <rect x="372" y="65" width="100" height="60" rx="3"/>
+            <rect x="492" y="65" width="100" height="60" rx="3"/>
+            <rect x="612" y="65" width="136" height="60" rx="3"/>
+          </g>
+          <rect x="612" y="65" width="136" height="3" rx="1.5" fill="var(--accent,#B8754A)"/>
+          <!-- arrows -->
+          <g stroke="var(--faint,#A9A7A1)" stroke-width="1.2" fill="var(--faint,#A9A7A1)">
+            <line x1="112" y1="95" x2="130" y2="95"/><polygon points="130,92 134,95 130,98"/>
+            <line x1="232" y1="95" x2="250" y2="95"/><polygon points="250,92 254,95 250,98"/>
+            <line x1="352" y1="95" x2="370" y2="95"/><polygon points="370,92 374,95 370,98"/>
+            <line x1="472" y1="95" x2="490" y2="95"/><polygon points="490,92 494,95 490,98"/>
+            <line x1="592" y1="95" x2="610" y2="95"/><polygon points="610,92 614,95 610,98"/>
+          </g>
+          <!-- labels -->
+          <g fill="var(--ink,#1A1A1A)" font-size="9" text-anchor="middle">
+            <text x="62"  y="87">Corpus</text>
+            <text x="62"  y="99">1,043 JDs</text>
+            <text x="62"  y="111">LinkedIn +</text>
+            <text x="62"  y="121">O*NET</text>
+            <text x="182" y="87">BERT NER</text>
+            <text x="182" y="99">JobBERT</text>
+            <text x="182" y="111">extract</text>
+            <text x="182" y="121">competency</text>
+            <text x="302" y="87">Semantic</text>
+            <text x="302" y="99">similarity</text>
+            <text x="302" y="111">all-MiniLM</text>
+            <text x="302" y="121">match terms</text>
+            <text x="422" y="87">TF-IDF</text>
+            <text x="422" y="99">role-specific</text>
+            <text x="422" y="111">importance</text>
+            <text x="542" y="87">3-tier</text>
+            <text x="542" y="99">taxonomy</text>
+            <text x="542" y="111">Core /</text>
+            <text x="542" y="121">Functional</text>
+            <text x="680" y="87">PowerApps</text>
+            <text x="680" y="99">+ SharePoint</text>
+            <text x="680" y="111">HR explorer</text>
+          </g>
+          <!-- audit notes below -->
+          <g fill="var(--faint,#A9A7A1)" font-size="8" text-anchor="middle">
+            <text x="62"  y="155">data</text>
+            <text x="182" y="155">extraction</text>
+            <text x="302" y="155">validation ← audit</text>
+            <text x="422" y="155">weighting</text>
+            <text x="542" y="155">taxonomy ← audit</text>
+            <text x="680" y="155">deploy ← HR owns it</text>
+          </g>
+        </svg>
+        <figcaption>Fig. 1. End-to-end NLP pipeline. Each stage produces an artefact a person can audit — the semantic similarity step and the taxonomy are both human-reviewable checkpoints before deployment.</figcaption>
+      </figure>
+
+      <h2 id="challenges"><span class="num">04</span>Challenges</h2>
+      <p>Three things ate most of the time and surprised me in different ways:</p>
+      <ul>
+        <li><b>Mixed-language text.</b> About a third of the corpus switched languages mid-sentence between Turkish and English. Early embeddings clustered by <em>language</em>, not <em>meaning</em>, which looked plausible and was completely useless until we caught it.</li>
+        <li><b>Taxonomy politics.</b> Two people will describe the same job in different words on purpose. The model can surface that, but it cannot resolve it, and it should not try. Sometimes the right answer is a meeting, not an embedding.</li>
+        <li><b>The long tail.</b> Around 80% of competencies were covered by a small number of clusters. The remaining 20% were the interesting ones and the hardest to validate. They were also where the value lived, which is the standard pattern for any NLP project of this shape.</li>
+      </ul>
+
+      <div class="callout">
+        <h6>What I'd say to my earlier self</h6>
+        <p>Start the review interface on day one, not month three. The modelling improved fastest once HR could see and react to it. The pipeline was, in practical terms, an excuse to give them a better spreadsheet.</p>
+      </div>
+
+      <h2 id="outcome"><span class="num">05</span>Outcome</h2>
+      <p>The platform was developed into a working HR decision-support prototype for the strategic workforce-planning team, showing how the yearly competency-review process could become more dynamic and evidence-based. A few indicative numbers from the first three months of internal use:</p>
+      <div class="outcomes">
+        <div class="outcome"><div class="n">1,043</div><div class="l">job descriptions ingested</div></div>
+        <div class="outcome"><div class="n">−<em>62%</em></div><div class="l">review time per role</div></div>
+        <div class="outcome"><div class="n"><em>3</em>×</div><div class="l">competency-map refresh rate</div></div>
+      </div>
+      <p>Beyond the numbers, the platform gave HR a standardised competency language where none had existed before. Managers and recruiters could now point to the same definitions when discussing the same role, which is the precondition for almost every downstream HR analytics project the team wanted to run.</p>
+
+      <figure>
+        <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border:1px solid var(--hairline);border-radius:4px;background:var(--card);font-family:'Geist',ui-sans-serif,system-ui,sans-serif;" aria-label="PowerApps competency explorer mockup">
+          <!-- app chrome -->
+          <rect x="0" y="0" width="760" height="360" rx="4" fill="#f5f5f5"/>
+          <!-- top nav bar -->
+          <rect x="0" y="0" width="760" height="44" rx="4" fill="#1A1A1A"/>
+          <rect x="0" y="36" width="760" height="8" fill="#1A1A1A"/>
+          <text x="20" y="27" font-size="13" fill="white" font-weight="500">Competency Intelligence · Mercedes-Benz Türk</text>
+          <text x="700" y="27" font-size="11" fill="#999" text-anchor="middle">HR Strategic</text>
+          <!-- sidebar -->
+          <rect x="0" y="44" width="180" height="316" fill="#F8F8F8" stroke="#E5E2DB" stroke-width="0.5"/>
+          <text x="16" y="70" font-size="10" fill="#6B6B68" letter-spacing="0.06em">FILTER BY</text>
+          <!-- filter group: tier -->
+          <text x="16" y="92" font-size="11" fill="#1A1A1A">Tier</text>
+          <rect x="16" y="98" width="148" height="24" rx="3" fill="white" stroke="#E5E2DB" stroke-width="1"/>
+          <rect x="16" y="98" width="148" height="24" rx="3" fill="var(--accent-soft,#B8754A22)"/>
+          <text x="28" y="115" font-size="10" fill="#B8754A">✓ Core</text>
+          <rect x="16" y="128" width="148" height="24" rx="3" fill="white" stroke="#E5E2DB" stroke-width="1"/>
+          <text x="28" y="145" font-size="10" fill="#6B6B68">  Leadership / Mgmt</text>
+          <rect x="16" y="158" width="148" height="24" rx="3" fill="white" stroke="#E5E2DB" stroke-width="1"/>
+          <text x="28" y="175" font-size="10" fill="#6B6B68">  Functional</text>
+          <!-- filter group: role -->
+          <text x="16" y="205" font-size="11" fill="#1A1A1A">Role family</text>
+          <rect x="16" y="211" width="148" height="24" rx="3" fill="white" stroke="#E5E2DB" stroke-width="1"/>
+          <text x="28" y="228" font-size="10" fill="#6B6B68">All roles ▾</text>
+          <!-- main content area -->
+          <rect x="180" y="44" width="580" height="316" fill="white"/>
+          <!-- header row -->
+          <rect x="196" y="60" width="548" height="1" fill="#E5E2DB"/>
+          <text x="196" y="78" font-size="13" fill="#1A1A1A" font-weight="500">Core Competencies</text>
+          <text x="696" y="78" font-size="10" fill="#B8754A" text-anchor="end">Refresh ↻</text>
+          <text x="196" y="92" font-size="10" fill="#6B6B68">Showing 8 competencies · sourced from 1,043 job descriptions · last refreshed today</text>
+          <!-- competency cards -->
+          <g>
+            <!-- row 1 -->
+            <rect x="196" y="106" width="170" height="68" rx="3" fill="#FAF8F4" stroke="#E5E2DB" stroke-width="1"/>
+            <rect x="196" y="106" width="170" height="3" rx="1.5" fill="#B8754A"/>
+            <text x="208" y="124" font-size="11" fill="#1A1A1A" font-weight="500">Communication</text>
+            <text x="208" y="138" font-size="9" fill="#6B6B68">Clarity · written &amp; verbal · active</text>
+            <text x="208" y="150" font-size="9" fill="#6B6B68">listening · cross-functional</text>
+            <text x="208" y="166" font-size="9" fill="#A9A7A1">Used in 94% of roles</text>
+
+            <rect x="378" y="106" width="170" height="68" rx="3" fill="#FAF8F4" stroke="#E5E2DB" stroke-width="1"/>
+            <rect x="378" y="106" width="170" height="3" rx="1.5" fill="#B8754A"/>
+            <text x="390" y="124" font-size="11" fill="#1A1A1A" font-weight="500">Accountability</text>
+            <text x="390" y="138" font-size="9" fill="#6B6B68">Ownership · delivery under</text>
+            <text x="390" y="150" font-size="9" fill="#6B6B68">pressure · follow-through</text>
+            <text x="390" y="166" font-size="9" fill="#A9A7A1">Used in 91% of roles</text>
+
+            <rect x="560" y="106" width="164" height="68" rx="3" fill="#FAF8F4" stroke="#E5E2DB" stroke-width="1"/>
+            <rect x="560" y="106" width="164" height="3" rx="1.5" fill="#B8754A"/>
+            <text x="572" y="124" font-size="11" fill="#1A1A1A" font-weight="500">Learning agility</text>
+            <text x="572" y="138" font-size="9" fill="#6B6B68">Adapts quickly · seeks</text>
+            <text x="572" y="150" font-size="9" fill="#6B6B68">feedback · grows from</text>
+            <text x="572" y="166" font-size="9" fill="#A9A7A1">Used in 88% of roles</text>
+
+            <!-- row 2 -->
+            <rect x="196" y="186" width="170" height="68" rx="3" fill="#FAF8F4" stroke="#E5E2DB" stroke-width="1"/>
+            <rect x="378" y="186" width="170" height="68" rx="3" fill="#FAF8F4" stroke="#E5E2DB" stroke-width="1"/>
+            <rect x="560" y="186" width="164" height="68" rx="3" fill="#FAF8F4" stroke="#E5E2DB" stroke-width="1"/>
+            <text x="208" y="204" font-size="11" fill="#1A1A1A" font-weight="500">Collaboration</text>
+            <text x="208" y="218" font-size="9" fill="#6B6B68">Team-first · stakeholder</text>
+            <text x="208" y="246" font-size="9" fill="#A9A7A1">Used in 87% of roles</text>
+            <text x="390" y="204" font-size="11" fill="#1A1A1A" font-weight="500">Problem solving</text>
+            <text x="390" y="218" font-size="9" fill="#6B6B68">Analytical · structured</text>
+            <text x="390" y="246" font-size="9" fill="#A9A7A1">Used in 82% of roles</text>
+            <text x="572" y="204" font-size="11" fill="#1A1A1A" font-weight="500">Customer focus</text>
+            <text x="572" y="218" font-size="9" fill="#6B6B68">Internal + external</text>
+            <text x="572" y="246" font-size="9" fill="#A9A7A1">Used in 79% of roles</text>
+          </g>
+          <!-- status bar -->
+          <rect x="180" y="336" width="580" height="24" fill="#F8F8F8" stroke="#E5E2DB" stroke-width="0.5"/>
+          <text x="196" y="352" font-size="9" fill="#A9A7A1">Competency Intelligence Platform · Built on Microsoft 365 · No additional licences required</text>
+        </svg>
+        <figcaption>Fig. 2. The competency explorer HR uses to browse, filter, and assign competencies by tier and role family. Built inside Microsoft 365 — no procurement required, no training overhead.</figcaption>
+      </figure>
+
+      <h2 id="reflection"><span class="num">06</span>What I'd do differently</h2>
+      <p>Three things would make a second pass meaningfully better:</p>
+      <ul>
+        <li><b>A self-updating pipeline.</b> The current refresh is manual. Re-running automatically whenever new postings or role changes land in SharePoint would let the taxonomy stay genuinely live rather than only at refresh time.</li>
+        <li><b>Validation beyond semantic similarity.</b> Embeddings can confirm that two phrases mean the same thing. They cannot confirm that the inferred competency is what the job actually requires. Short structured interviews with role holders, used as ground truth, would close that gap.</li>
+        <li><b>Production and engineering as the next pilot.</b> HR already understands competency frameworks. The harder test is rolling the same system out to departments where the vocabulary is more technical and the phrasing less standardised. Until that works, the pilot is the easy half of the job.</li>
+      </ul>
+
+      <p>The broader lesson I took forward is that the model was the easy part. The work that made the project real was in the seams: understanding how HR would actually use it, choosing infrastructure they could own, and treating the review loop as a collaboration rather than a checkpoint. Most of my best decisions, in hindsight, were subtractions.</p>
+    </article>
+  </section>
+
+  <section class="next">
+    <div class="wrap">
+      <h3>More work</h3>
+      <div class="next-grid">
+        <a class="next-card" href="project-mental-health.html">
+          <div class="dir">← previous</div>
+          <h4>Student mental health dashboard</h4>
+          <p>Solo · Streamlit · Python, 2025</p>
+        </a>
+        <a class="next-card" href="project-eeg.html" style="text-align: right;">
+          <div class="dir">next →</div>
+          <h4>EEG mental workload classification</h4>
+          <p>Solo · Deep learning · COG-BCI MATB, 2025</p>
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-inner">
+    <div>© <span id="footYear">2026</span> Dilara Bayram · Coventry, UK</div>
+    <div>Built with care · HTML, CSS, a little JavaScript</div>
+  </div>
+</footer>
+
+<script>
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const sun = document.getElementById('sunIcon');
+  if (theme === 'dark') {
+    sun.innerHTML = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  } else {
+    sun.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>';
+  }
+}
+let saved = 'light';
+try { saved = (JSON.parse(localStorage.getItem('dilara_tweaks') || '{}').theme) || 'light'; } catch(e) {}
+applyTheme(saved);
+document.getElementById('themeToggle').addEventListener('click', () => {
+  saved = saved === 'dark' ? 'light' : 'dark';
+  applyTheme(saved);
+  try {
+    const s = JSON.parse(localStorage.getItem('dilara_tweaks') || '{}');
+    s.theme = saved;
+    localStorage.setItem('dilara_tweaks', JSON.stringify(s));
+  } catch(e) {}
+});
+
+// dynamic footer year
+document.getElementById('footYear').textContent = new Date().getFullYear();
+
+// TOC active
+const ids = ['problem','approach','decisions','challenges','outcome','reflection'];
+const headings = ids.map(id => document.getElementById(id));
+const tocLinks = [...document.querySelectorAll('#toc a')];
+window.addEventListener('scroll', () => {
+  let current = ids[0];
+  for (const h of headings) {
+    if (h.getBoundingClientRect().top < 120) current = h.id;
+  }
+  tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current));
+}, { passive: true });
+</script>
+</body>
+</html>

@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Diabetes risk prediction, Dilara Bayram</title>
+<meta name="description" content="A pre-screening tool for diabetes risk that optimises for recall over accuracy. XGBoost + Platt calibration + SHAP on CDC BRFSS data." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #FAF8F4; --ink: #1A1A1A; --muted: #6B6B68; --faint: #A9A7A1;
+  --hairline: #E5E2DB; --card: #F3F0E9;
+  --accent: oklch(0.58 0.09 45); --accent-soft: oklch(0.58 0.09 45 / 0.14);
+  --serif: "Instrument Serif", Georgia, serif;
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, Menlo, monospace;
+  --maxw: 1120px; --gutter: clamp(20px, 5vw, 56px);
+}
+html[data-theme="dark"] {
+  --paper: #111110; --ink: #EDEBE6; --muted: #8A8885; --faint: #5A5854;
+  --hairline: #26241F; --card: #181714;
+  --accent: oklch(0.72 0.09 45); --accent-soft: oklch(0.72 0.09 45 / 0.16);
+}
+* { box-sizing: border-box; }
+body { margin:0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; transition: background-color .35s, color .35s; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter); }
+
+/* nav */
+.nav { position: sticky; top: 0; z-index: 50; background: color-mix(in oklch, var(--paper) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--hairline); }
+.nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.mark { font-family: var(--serif); font-size: 22px; letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
+.mark .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; transform: translateY(-2px); }
+.nav-right { display: flex; gap: 8px; align-items: center; }
+.back { font-size: 14px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--hairline); }
+.back:hover { color: var(--ink); border-color: var(--ink); }
+.back svg { width: 14px; height: 14px; }
+.theme-toggle { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--hairline); border-radius: 999px; background: transparent; color: var(--ink); }
+.theme-toggle:hover { border-color: var(--ink); }
+.theme-toggle svg { width: 16px; height: 16px; }
+
+/* header */
+.doc-head { padding: clamp(56px, 10vw, 112px) 0 48px; border-bottom: 1px solid var(--hairline); }
+.crumb { display: flex; gap: 14px; align-items: center; font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.04em; margin-bottom: 28px; }
+.crumb .sep { opacity: 0.5; }
+.doc-title { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 6vw, 68px); letter-spacing: -0.02em; line-height: 1.05; margin: 0 0 20px; max-width: 22ch; }
+.doc-title em { font-style: italic; color: var(--muted); }
+.doc-tagline { font-size: 18px; color: var(--muted); max-width: 60ch; margin: 0 0 40px; text-wrap: pretty; }
+.doc-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+.doc-meta dt { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin-bottom: 6px; }
+.doc-meta dd { margin: 0; font-size: 14px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 3px 9px; border: 1px solid var(--hairline); border-radius: 999px; }
+.links { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 7px 12px; border: 1px solid var(--hairline); border-radius: 999px; color: var(--ink); background: transparent; }
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn svg { width: 12px; height: 12px; }
+
+/* metric strip in header */
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; margin-top: 48px; }
+.metric-card { background: var(--paper); padding: 22px 20px; }
+.metric-val { font-family: var(--serif); font-size: 36px; line-height: 1; letter-spacing: -0.015em; display: block; color: var(--ink); }
+.metric-val em { font-style: italic; color: var(--accent); }
+.metric-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; display: block; margin-top: 10px; }
+
+/* body */
+.doc-body { display: grid; grid-template-columns: 220px 1fr; gap: 64px; padding: 80px 0 96px; }
+.toc { position: sticky; top: 88px; align-self: start; font-size: 13px; }
+.toc h5 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 14px; }
+.toc a { display: block; padding: 6px 0; color: var(--muted); border-left: 1px solid var(--hairline); padding-left: 14px; transition: color .2s, border-color .2s; }
+.toc a.active, .toc a:hover { color: var(--ink); border-color: var(--ink); }
+
+.prose { max-width: 64ch; }
+.prose h2 {
+  font-family: var(--serif); font-weight: 400; font-size: 32px; letter-spacing: -0.015em;
+  margin: 56px 0 16px; line-height: 1.15; scroll-margin-top: 88px;
+}
+.prose h2:first-child { margin-top: 0; }
+.prose h2 .num { font-family: var(--mono); font-size: 12px; color: var(--faint); display: block; letter-spacing: 0.04em; margin-bottom: 6px; }
+.prose p { font-size: 17px; line-height: 1.7; margin: 0 0 18px; color: var(--ink); text-wrap: pretty; }
+.prose p.lead { font-family: var(--serif); font-size: 22px; line-height: 1.45; color: var(--muted); margin-bottom: 24px; }
+.prose ul { padding-left: 18px; margin: 0 0 18px; }
+.prose li { margin-bottom: 8px; }
+.prose b, .prose strong { font-weight: 500; color: var(--ink); }
+.prose figure { margin: 32px 0; }
+.prose figure .placeholder {
+  aspect-ratio: 16/9; border: 1px solid var(--hairline); background:
+    repeating-linear-gradient(45deg, var(--hairline) 0 1px, transparent 1px 10px),
+    var(--card);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.06em;
+  border-radius: 4px; text-align: center; padding: 16px;
+}
+.prose figure figcaption { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.04em; margin-top: 10px; }
+
+.callout {
+  border: 1px solid var(--hairline); padding: 20px 22px; border-radius: 4px;
+  background: var(--card); margin: 28px 0;
+}
+.callout h6 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 8px; }
+.callout p { margin: 0; font-size: 15px; }
+.callout p + p { margin-top: 10px; }
+
+/* decision table */
+.dec-table { border-top: 1px solid var(--hairline); margin: 24px 0; }
+.dec-row { display: grid; grid-template-columns: 160px 1fr; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--hairline); align-items: start; }
+.dec-row .k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--faint); padding-top: 3px; }
+.dec-row .v { font-size: 15px; line-height: 1.55; }
+.dec-row .v b { font-weight: 500; }
+
+/* error matrix (tiny 2x2) */
+.err-matrix { display: grid; grid-template-columns: 88px repeat(2, 1fr); gap: 0; border: 1px solid var(--hairline); border-radius: 4px; margin: 24px 0; font-size: 14px; overflow: hidden; }
+.err-matrix > div { padding: 14px 16px; border-bottom: 1px solid var(--hairline); border-right: 1px solid var(--hairline); }
+.err-matrix > div:nth-child(3n) { border-right: 0; }
+.err-matrix > div.head { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); background: var(--card); }
+.err-matrix .cell b { display: block; font-weight: 500; margin-bottom: 4px; }
+.err-matrix .cell p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.err-matrix .cell.bad b { color: var(--accent); }
+.err-matrix > div:nth-last-child(-n+3) { border-bottom: 0; }
+
+/* results table */
+.results-table { width: 100%; border-collapse: collapse; margin: 8px 0 32px; font-size: 15px; }
+.results-table th, .results-table td { padding: 12px 14px; border-bottom: 1px solid var(--hairline); text-align: left; }
+.results-table thead th { font-family: var(--mono); font-weight: 400; font-size: 10px; letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; padding-top: 8px; padding-bottom: 12px; border-bottom-color: var(--ink); }
+.results-table td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.results-table th.num { text-align: right; }
+.results-table tr.best td { background: var(--accent-soft); }
+.results-table tr.best td b { color: var(--accent); font-weight: 500; }
+
+/* next */
+.next { border-top: 1px solid var(--hairline); padding: 56px 0 80px; }
+.next h3 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 16px; }
+.next-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.next-card { border: 1px solid var(--hairline); padding: 24px; border-radius: 4px; transition: border-color .2s, background .2s; display: block; }
+.next-card:hover { border-color: var(--ink); background: var(--card); }
+.next-card .dir { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-bottom: 10px; letter-spacing: 0.06em; }
+.next-card h4 { font-family: var(--serif); font-weight: 400; font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.next-card p { margin: 0; font-size: 14px; color: var(--muted); }
+
+footer { border-top: 1px solid var(--hairline); padding: 40px 0 48px; font-size: 13px; color: var(--muted); }
+.footer-inner { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+
+@media (max-width: 880px) {
+  .doc-body { grid-template-columns: 1fr; gap: 32px; }
+  .toc { position: static; }
+  .doc-meta { grid-template-columns: repeat(2, 1fr); }
+  .metrics-row { grid-template-columns: repeat(2, 1fr); }
+  .dec-row { grid-template-columns: 1fr; gap: 4px; }
+  .err-matrix { grid-template-columns: 1fr 1fr; }
+  .err-matrix > div:first-child { display: none; }
+  .next-grid { grid-template-columns: 1fr; }
+  .results-table { font-size: 13px; }
+  .results-table th, .results-table td { padding: 10px 8px; }
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a href="index.html" class="mark">Dilara Bayram<span class="dot"></span></a>
+    <div class="nav-right">
+      <a class="back" href="index.html#projects">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 18l-6-6 6-6"/></svg>
+        All work
+      </a>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg id="sunIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="doc-head">
+    <div class="wrap">
+      <div class="crumb">
+        <span>Case study</span><span class="sep">/</span><span>2025</span><span class="sep">/</span><span>solo · machine learning · cdc brfss</span>
+      </div>
+      <h1 class="doc-title">Diabetes risk prediction, <em>tuned for the right kind of mistake.</em></h1>
+      <p class="doc-tagline">A pre-screening tool for diabetes risk built on CDC BRFSS data. The whole design pivots on one clinical decision: false negatives are far more costly than false positives, so the model is tuned for recall, not accuracy, and the threshold makes that explicit.</p>
+
+      <dl class="doc-meta">
+        <div>
+          <dt>Role</dt>
+          <dd>Solo, data, modelling, calibration, write-up</dd>
+        </div>
+        <div>
+          <dt>Module</dt>
+          <dd>WM9QG Fundamentals of AI &amp; Data Mining · Warwick, 2025</dd>
+        </div>
+        <div>
+          <dt>Stack</dt>
+          <dd><div class="pills"><span class="pill">python</span><span class="pill">xgboost</span><span class="pill">shap</span><span class="pill">platt calibration</span><span class="pill">crisp-dm</span></div></dd>
+        </div>
+        <div>
+          <dt>Links</dt>
+          <dd><div class="links"><a class="btn primary" href="https://github.com/dilaraBy/diabetes-risk-prediction" target="_blank" rel="noopener">GitHub repo</a></div></dd>
+        </div>
+      </dl>
+
+      <div class="metrics-row">
+        <div class="metric-card">
+          <span class="metric-val"><em>~80%</em></span>
+          <span class="metric-label">Recall · diabetic class</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val">0.82</span>
+          <span class="metric-label">ROC-AUC</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val">0.15</span>
+          <span class="metric-label">Decision threshold</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val">250k</span>
+          <span class="metric-label">CDC BRFSS observations</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="doc-body wrap">
+    <aside class="toc" id="toc">
+      <h5>on this page</h5>
+      <a href="#problem" class="active">Problem</a>
+      <a href="#approach">Approach</a>
+      <a href="#decisions">Key decisions</a>
+      <a href="#explain">Explainability</a>
+      <a href="#results">Results</a>
+      <a href="#reflection">What I'd do differently</a>
+    </aside>
+
+    <article class="prose">
+      <h2 id="problem"><span class="num">01</span>The problem</h2>
+      <p class="lead">Nearly 45% of adults with diabetes worldwide don't know they have it. "Early detection" is the intervention, but only if the model is tuned for the right kind of mistake.</p>
+      <p>The global healthcare cost of diabetes has grown 338% over 17 years and is projected to hit $1 trillion by 2050. A pre-screening tool that can flag at-risk people for follow-up testing has real value, but only if it's built around the clinical reality of how it will be used.</p>
+      <p>That reality is asymmetric. A pre-screening tool has two ways to be wrong, and they aren't equal:</p>
+
+      <div class="err-matrix">
+        <div class="head"></div>
+        <div class="head">Predicted healthy</div>
+        <div class="head">Predicted at-risk</div>
+        <div class="head">Actually healthy</div>
+        <div class="cell"><b>True negative</b><p>Correct, no action.</p></div>
+        <div class="cell"><b>False positive</b><p>Annoying. Sends a healthy person for a follow-up test.</p></div>
+        <div class="head">Actually diabetic</div>
+        <div class="cell bad"><b>False negative</b><p>Tells a diabetic person they're fine. They delay treatment. Complications develop.</p></div>
+        <div class="cell"><b>True positive</b><p>Correct, referred for testing.</p></div>
+      </div>
+
+      <p>False negatives are far more costly. That realisation determined the entire model design: <b>optimise for recall, not accuracy or F1.</b> Everything downstream, the threshold, the calibration, the loss surface I cared about, followed from that single decision.</p>
+
+      <h2 id="approach"><span class="num">02</span>Approach</h2>
+      <p>I worked through the full CRISP-DM pipeline rather than jumping straight to a classifier. The framework's value, on a dataset this messy, is that it forces you to look at the data before you model it.</p>
+      <ul>
+        <li><b>Dataset.</b> CDC BRFSS, 250,000 survey observations across the full set of behavioural and health indicators, with strong class imbalance (most respondents non-diabetic).</li>
+        <li><b>Association Rule Mining first.</b> Apriori (min 2% support, min 30% confidence, lift &gt; 1.5) to surface co-occurring risk patterns before committing to a model. Top pattern: poor general health combined with other risk factors. This phase was about understanding the structure of the data, not about producing rules to ship.</li>
+        <li><b>Classification, three-class.</b> No diabetes / Prediabetes / Diabetes. Three-class is more clinically meaningful than binary, prediabetes is exactly the intervention window where lifestyle changes still work.</li>
+        <li><b>Model.</b> XGBoost with Platt (sigmoid) calibration so probability outputs are interpretable, not just ordinal scores. Threshold set at 0.15 rather than the default 0.5, this is where the recall trade-off is made explicit.</li>
+        <li><b>Clustering, in parallel.</b> Unsupervised segmentation to group the population into risk profiles for targeted public-health interventions. Ran alongside the classification work, not after it.</li>
+      </ul>
+
+      <figure>
+        <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border:1px solid var(--hairline);border-radius:4px;background:var(--card);font-family:'Geist Mono',ui-monospace,Menlo,monospace;" aria-label="CRISP-DM pipeline for diabetes risk prediction">
+          <!-- track line -->
+          <line x1="56" y1="100" x2="704" y2="100" stroke="var(--hairline,#E5E2DB)" stroke-width="1" stroke-dasharray="4 3"/>
+          <!-- boxes -->
+          <g fill="var(--paper,#FAF8F4)" stroke="var(--hairline,#E5E2DB)" stroke-width="1">
+            <rect x="12"  y="68" width="88" height="64" rx="3"/>
+            <rect x="120" y="68" width="88" height="64" rx="3"/>
+            <rect x="228" y="68" width="88" height="64" rx="3"/>
+            <rect x="336" y="68" width="88" height="64" rx="3"/>
+            <rect x="444" y="68" width="88" height="64" rx="3"/>
+            <rect x="552" y="68" width="88" height="64" rx="3"/>
+            <rect x="660" y="68" width="88" height="64" rx="3"/>
+          </g>
+          <!-- accent borders on key decisions -->
+          <rect x="336" y="68" width="88" height="3" rx="1.5" fill="var(--accent,#B8754A)"/>
+          <rect x="444" y="68" width="88" height="3" rx="1.5" fill="var(--accent,#B8754A)"/>
+          <rect x="552" y="68" width="88" height="3" rx="1.5" fill="var(--accent,#B8754A)"/>
+          <!-- arrows -->
+          <g stroke="var(--faint,#A9A7A1)" stroke-width="1.2" fill="var(--faint,#A9A7A1)">
+            <line x1="100" y1="100" x2="118" y2="100"/><polygon points="118,97 122,100 118,103"/>
+            <line x1="208" y1="100" x2="226" y2="100"/><polygon points="226,97 230,100 226,103"/>
+            <line x1="316" y1="100" x2="334" y2="100"/><polygon points="334,97 338,100 334,103"/>
+            <line x1="424" y1="100" x2="442" y2="100"/><polygon points="442,97 446,100 442,103"/>
+            <line x1="532" y1="100" x2="550" y2="100"/><polygon points="550,97 554,100 550,103"/>
+            <line x1="640" y1="100" x2="658" y2="100"/><polygon points="658,97 662,100 658,103"/>
+          </g>
+          <!-- labels -->
+          <g fill="var(--ink,#1A1A1A)" font-size="9" text-anchor="middle">
+            <text x="56"  y="88">CDC BRFSS</text>
+            <text x="56"  y="100">250k obs</text>
+            <text x="56"  y="112">21 features</text>
+            <text x="164" y="88">Apriori</text>
+            <text x="164" y="100">rule mining</text>
+            <text x="164" y="112">min sup 2%</text>
+            <text x="272" y="88">Data prep</text>
+            <text x="272" y="100">stratified</text>
+            <text x="272" y="112">split + impute</text>
+            <text x="380" y="88">XGBoost</text>
+            <text x="380" y="100">scale_pos</text>
+            <text x="380" y="112">_weight</text>
+            <text x="488" y="88">Platt</text>
+            <text x="488" y="100">calibration</text>
+            <text x="488" y="112">(sigmoid)</text>
+            <text x="596" y="88">Threshold</text>
+            <text x="596" y="100">0.15</text>
+            <text x="596" y="112">recall ≥ 80%</text>
+            <text x="704" y="88">SHAP</text>
+            <text x="704" y="100">per-row</text>
+            <text x="704" y="112">explanation</text>
+          </g>
+          <!-- phase label -->
+          <g fill="var(--accent,#B8754A)" font-size="8" text-anchor="middle">
+            <text x="380" y="170">← three highlighted steps are the core design decisions</text>
+          </g>
+        </svg>
+        <figcaption>Fig. 1, CRISP-DM pipeline. Association rules first, classifier second — ARM informed feature intuition rather than competing with the model. The three accent-bordered stages (XGBoost, Platt calibration, threshold 0.15) are where the cost-asymmetric design lives.</figcaption>
+      </figure>
+
+      <h2 id="decisions"><span class="num">03</span>Key decisions</h2>
+      <p>Three choices mattered more than the model architecture itself:</p>
+      <div class="dec-table">
+        <div class="dec-row">
+          <div class="k">Threshold 0.15</div>
+          <div class="v"><b>Not 0.5.</b> The default threshold assumes equal cost for both error types. That's wrong in a clinical context. 0.15 pushes the model toward recall at the expense of precision, more referrals, fewer missed cases. This is a domain decision, not a model-tuning decision, and the case study calls it out as such.</div>
+        </div>
+        <div class="dec-row">
+          <div class="k">Platt calibration</div>
+          <div class="v"><b>Make the probabilities mean something.</b> Uncalibrated XGBoost scores are not probabilities, they're relative rankings. Calibration is what makes a 0.15 threshold meaningful: "this person has a 15% estimated probability of diabetes" is a clinical statement. "This person has a score of 0.15 on an arbitrary scale" is not.</div>
+        </div>
+        <div class="dec-row">
+          <div class="k">Stratified split</div>
+          <div class="v"><b>Fit all preprocessing on training data only, then apply to test.</b> Scaling, resampling, every transform, train-only. Easy to skip, quietly ruins your evaluation. With strong class imbalance, stratification at the split is the only way to keep both classes representative in the test set.</div>
+        </div>
+        <div class="dec-row">
+          <div class="k">SHAP, not feature importance</div>
+          <div class="v"><b>Per-prediction explanations, not just global ranks.</b> Tree-based importance scores are global; SHAP values are per-row and signed, so I can show a clinician <em>why</em> a specific patient got flagged. For a screening tool, that matters more than knowing which feature mattered overall.</div>
+        </div>
+      </div>
+
+      <h2 id="explain"><span class="num">04</span>Explainability</h2>
+      <p>The top risk factors from SHAP, <b>general health self-rating, age, high blood pressure, BMI</b>, match what a GP already knows. I take that as a sign of validity rather than a boring result. A screening model that surfaces risk factors a clinician disagrees with isn't necessarily wrong, but it owes you a much bigger explanation. One that matches clinical intuition only owes you an evaluation.</p>
+
+      <figure>
+        <img src="assets/img/diabetes/shap_summary.png" alt="SHAP beeswarm summary plot. Top features: GenHlth, Age, HighBP, BMI. High feature values (pink) push toward at-risk prediction; low values (blue) push toward no-diabetes." style="width:100%;display:block;border:1px solid var(--hairline);border-radius:4px;background:var(--card);">
+        <figcaption>Fig. 2, Global SHAP summary (beeswarm). GenHlth, Age, HighBP, and BMI dominate — consistent with established clinical risk factors. The right kind of boring.</figcaption>
+      </figure>
+
+      <div class="callout">
+        <h6>Why this matters for deployment</h6>
+        <p>A screening tool needs to do two things at once: surface high-risk patients, and explain why. SHAP makes the second possible without giving up the first, the model stays an XGBoost classifier, and the explanation layer sits on top.</p>
+      </div>
+
+      <h2 id="results"><span class="num">05</span>Results</h2>
+      <p>Headline numbers on the held-out test set:</p>
+
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th class="num">Value</th>
+            <th>Why this matters</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="best">
+            <td><b>Recall (diabetic class)</b></td>
+            <td class="num"><b>~80%</b></td>
+            <td>The cost-asymmetric target. 4 in 5 diabetic patients flagged.</td>
+          </tr>
+          <tr>
+            <td>ROC-AUC</td>
+            <td class="num">0.82</td>
+            <td>Threshold-independent discrimination.</td>
+          </tr>
+          <tr>
+            <td>Decision threshold</td>
+            <td class="num">0.15</td>
+            <td>Where the recall trade-off is made explicit.</td>
+          </tr>
+          <tr>
+            <td>Class</td>
+            <td class="num">3-way</td>
+            <td>No diabetes / Prediabetes / Diabetes.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <figure>
+        <img src="assets/img/diabetes/threshold_analysis.png" alt="Two plots: Metrics vs Classification Threshold showing where recall crosses 0.80 (dotted line), and a scatter of balanced accuracy vs recall with valid operating points highlighted in green above the 0.80 recall target." style="width:100%;display:block;border:1px solid var(--hairline);border-radius:4px;background:var(--card);">
+        <figcaption>Fig. 3, Threshold analysis. Left: recall, specificity, precision and balanced accuracy vs threshold — the dotted line marks the 80% recall target that drives the 0.15 decision. Right: all operating points with recall ≥ 80% shown in green; 0.15 sits at the balanced-accuracy peak of the valid set.</figcaption>
+      </figure>
+
+      <h2 id="reflection"><span class="num">06</span>What I'd do differently</h2>
+      <p>Two limitations I want to be explicit about, because a screening tool that ignores them isn't ready for clinical use:</p>
+      <ul>
+        <li><b>Self-reported survey data introduces reporting bias.</b> BRFSS asks people about their own behaviour and health, that's both its scale advantage and its main weakness. People under-report things they're embarrassed about and over-report things they think the interviewer wants to hear. A model trained on self-report will mirror that.</li>
+        <li><b>Subgroup fairness was not audited.</b> Performance was reported in aggregate, not per age group, sex, or ethnicity. A deployed screening tool needs that breakdown before any clinical use, if recall drops 15pp on one subgroup, the cost-asymmetry argument breaks down for exactly the people who need the model to be cautious.</li>
+      </ul>
+
+      <p>The other thing I'd pursue: <b>cost-sensitive learning at the loss level</b>, rather than only at the threshold. Pushing the asymmetry into training rather than only into the decision rule would let the model learn a richer representation of "where the false negatives live", and would make the threshold less load-bearing.</p>
+    </article>
+  </section>
+
+  <section class="next">
+    <div class="wrap">
+      <h3>More work</h3>
+      <div class="next-grid">
+        <a class="next-card" href="project-eeg.html">
+          <div class="dir">← previous</div>
+          <h4>EEG mental workload classification</h4>
+          <p>Solo · Deep learning · COG-BCI MATB, 2025</p>
+        </a>
+        <a class="next-card" href="project-copurchase.html" style="text-align: right;">
+          <div class="dir">next →</div>
+          <h4>Customer purchase pattern analysis</h4>
+          <p>Solo · Graph algorithms · Python, 2025</p>
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-inner">
+    <div>© <span id="footYear">2026</span> Dilara Bayram, Coventry, UK</div>
+    <div>Built with care · HTML, CSS, a little JavaScript</div>
+  </div>
+</footer>
+
+<script>
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const sun = document.getElementById('sunIcon');
+  if (theme === 'dark') {
+    sun.innerHTML = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  } else {
+    sun.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>';
+  }
+}
+let saved = 'light';
+try { saved = (JSON.parse(localStorage.getItem('dilara_tweaks') || '{}').theme) || 'light'; } catch(e) {}
+applyTheme(saved);
+document.getElementById('themeToggle').addEventListener('click', () => {
+  saved = saved === 'dark' ? 'light' : 'dark';
+  applyTheme(saved);
+  try {
+    const s = JSON.parse(localStorage.getItem('dilara_tweaks') || '{}');
+    s.theme = saved;
+    localStorage.setItem('dilara_tweaks', JSON.stringify(s));
+  } catch(e) {}
+});
+
+// dynamic footer year
+document.getElementById('footYear').textContent = new Date().getFullYear();
+
+// TOC active
+const ids = ['problem','approach','decisions','explain','results','reflection'];
+const headings = ids.map(id => document.getElementById(id));
+const tocLinks = [...document.querySelectorAll('#toc a')];
+window.addEventListener('scroll', () => {
+  let current = ids[0];
+  for (const h of headings) {
+    if (h.getBoundingClientRect().top < 120) current = h.id;
+  }
+  tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current));
+}, { passive: true });
+</script>
+</body>
+</html>

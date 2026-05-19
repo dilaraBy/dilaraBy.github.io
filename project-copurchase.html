@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Customer purchase pattern analysis · Dilara Bayram</title>
+<meta name="description" content="A weighted co-purchase graph built from scratch over 14,963 supermarket baskets. The dataset has a gravitational centre, and the case study is honest about it." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #FAF8F4; --ink: #1A1A1A; --muted: #6B6B68; --faint: #A9A7A1;
+  --hairline: #E5E2DB; --card: #F3F0E9;
+  --accent: oklch(0.58 0.09 45); --accent-soft: oklch(0.58 0.09 45 / 0.14);
+  --serif: "Instrument Serif", Georgia, serif;
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, Menlo, monospace;
+  --maxw: 1120px; --gutter: clamp(20px, 5vw, 56px);
+}
+html[data-theme="dark"] {
+  --paper: #111110; --ink: #EDEBE6; --muted: #8A8885; --faint: #5A5854;
+  --hairline: #26241F; --card: #181714;
+  --accent: oklch(0.72 0.09 45); --accent-soft: oklch(0.72 0.09 45 / 0.16);
+}
+* { box-sizing: border-box; }
+body { margin:0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; transition: background-color .35s, color .35s; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter); }
+
+/* nav */
+.nav { position: sticky; top: 0; z-index: 50; background: color-mix(in oklch, var(--paper) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--hairline); }
+.nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.mark { font-family: var(--serif); font-size: 22px; letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
+.mark .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; transform: translateY(-2px); }
+.nav-right { display: flex; gap: 8px; align-items: center; }
+.back { font-size: 14px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--hairline); }
+.back:hover { color: var(--ink); border-color: var(--ink); }
+.back svg { width: 14px; height: 14px; }
+.theme-toggle { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--hairline); border-radius: 999px; background: transparent; color: var(--ink); }
+.theme-toggle:hover { border-color: var(--ink); }
+.theme-toggle svg { width: 16px; height: 16px; }
+
+/* header */
+.doc-head { padding: clamp(56px, 10vw, 112px) 0 48px; border-bottom: 1px solid var(--hairline); }
+.crumb { display: flex; gap: 14px; align-items: center; font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.04em; margin-bottom: 28px; }
+.crumb .sep { opacity: 0.5; }
+.doc-title { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 6vw, 68px); letter-spacing: -0.02em; line-height: 1.05; margin: 0 0 20px; max-width: 22ch; }
+.doc-title em { font-style: italic; color: var(--muted); }
+.doc-tagline { font-size: 18px; color: var(--muted); max-width: 60ch; margin: 0 0 40px; text-wrap: pretty; }
+.doc-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+.doc-meta dt { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin-bottom: 6px; }
+.doc-meta dd { margin: 0; font-size: 14px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 3px 9px; border: 1px solid var(--hairline); border-radius: 999px; }
+.links { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 7px 12px; border: 1px solid var(--hairline); border-radius: 999px; color: var(--ink); background: transparent; }
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn svg { width: 12px; height: 12px; }
+
+/* metric strip */
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 4px; margin-top: 48px; }
+.metric-card { background: var(--paper); padding: 22px 20px; }
+.metric-val { font-family: var(--serif); font-size: 36px; line-height: 1; letter-spacing: -0.015em; display: block; color: var(--ink); }
+.metric-val em { font-style: italic; color: var(--accent); }
+.metric-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; display: block; margin-top: 10px; }
+
+/* body */
+.doc-body { display: grid; grid-template-columns: 220px 1fr; gap: 64px; padding: 80px 0 96px; }
+.toc { position: sticky; top: 88px; align-self: start; font-size: 13px; }
+.toc h5 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 14px; }
+.toc a { display: block; padding: 6px 0; color: var(--muted); border-left: 1px solid var(--hairline); padding-left: 14px; transition: color .2s, border-color .2s; }
+.toc a.active, .toc a:hover { color: var(--ink); border-color: var(--ink); }
+
+.prose { max-width: 64ch; }
+.prose h2 {
+  font-family: var(--serif); font-weight: 400; font-size: 32px; letter-spacing: -0.015em;
+  margin: 56px 0 16px; line-height: 1.15; scroll-margin-top: 88px;
+}
+.prose h2:first-child { margin-top: 0; }
+.prose h2 .num { font-family: var(--mono); font-size: 12px; color: var(--faint); display: block; letter-spacing: 0.04em; margin-bottom: 6px; }
+.prose p { font-size: 17px; line-height: 1.7; margin: 0 0 18px; color: var(--ink); text-wrap: pretty; }
+.prose p.lead { font-family: var(--serif); font-size: 22px; line-height: 1.45; color: var(--muted); margin-bottom: 24px; }
+.prose ul { padding-left: 18px; margin: 0 0 18px; }
+.prose li { margin-bottom: 8px; }
+.prose b, .prose strong { font-weight: 500; color: var(--ink); }
+.prose figure { margin: 32px 0; }
+.prose figure img { width: 100%; display: block; border: 1px solid var(--hairline); border-radius: 4px; background: var(--card); }
+.prose figure .placeholder {
+  aspect-ratio: 16/9; border: 1px solid var(--hairline); background:
+    repeating-linear-gradient(45deg, var(--hairline) 0 1px, transparent 1px 10px),
+    var(--card);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.06em;
+  border-radius: 4px; text-align: center; padding: 16px;
+}
+.prose figure figcaption { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.04em; margin-top: 10px; }
+
+.callout {
+  border: 1px solid var(--hairline); padding: 20px 22px; border-radius: 4px;
+  background: var(--card); margin: 28px 0;
+}
+.callout h6 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 8px; }
+.callout p { margin: 0; font-size: 15px; }
+.callout p + p { margin-top: 10px; }
+
+/* decision table */
+.dec-table { border-top: 1px solid var(--hairline); margin: 24px 0; }
+.dec-row { display: grid; grid-template-columns: 160px 1fr; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--hairline); align-items: start; }
+.dec-row .k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--faint); padding-top: 3px; }
+.dec-row .v { font-size: 15px; line-height: 1.55; }
+.dec-row .v b { font-weight: 500; }
+
+/* query table (graph operations) */
+.query-table { width: 100%; border-collapse: collapse; margin: 8px 0 28px; font-size: 14px; }
+.query-table th, .query-table td { padding: 12px 14px; border-bottom: 1px solid var(--hairline); text-align: left; vertical-align: top; }
+.query-table thead th { font-family: var(--mono); font-weight: 400; font-size: 10px; letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; padding-top: 8px; padding-bottom: 12px; border-bottom-color: var(--ink); }
+.query-table td.q { color: var(--ink); }
+.query-table td.op { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.query-table td.cost { font-family: var(--mono); font-size: 12px; color: var(--accent); text-align: right; white-space: nowrap; }
+
+/* top bundles list */
+.bundles { border-top: 1px solid var(--hairline); margin: 24px 0; }
+.bundle { display: grid; grid-template-columns: 32px 1fr auto; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--hairline); align-items: center; font-size: 14px; }
+.bundle .rk { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.bundle .pair { font-size: 15px; }
+.bundle .pair b { font-weight: 500; }
+.bundle .pair .milk { color: var(--accent); font-weight: 500; }
+.bundle .w { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* next */
+.next { border-top: 1px solid var(--hairline); padding: 56px 0 80px; }
+.next h3 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 16px; }
+.next-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.next-card { border: 1px solid var(--hairline); padding: 24px; border-radius: 4px; transition: border-color .2s, background .2s; display: block; }
+.next-card:hover { border-color: var(--ink); background: var(--card); }
+.next-card .dir { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-bottom: 10px; letter-spacing: 0.06em; }
+.next-card h4 { font-family: var(--serif); font-weight: 400; font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.next-card p { margin: 0; font-size: 14px; color: var(--muted); }
+
+footer { border-top: 1px solid var(--hairline); padding: 40px 0 48px; font-size: 13px; color: var(--muted); }
+.footer-inner { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+
+@media (max-width: 880px) {
+  .doc-body { grid-template-columns: 1fr; gap: 32px; }
+  .toc { position: static; }
+  .doc-meta { grid-template-columns: repeat(2, 1fr); }
+  .metrics-row { grid-template-columns: repeat(2, 1fr); }
+  .dec-row { grid-template-columns: 1fr; gap: 4px; }
+  .next-grid { grid-template-columns: 1fr; }
+  .query-table { font-size: 13px; }
+  .query-table th, .query-table td { padding: 10px 8px; }
+  .bundle { grid-template-columns: 28px 1fr auto; gap: 10px; }
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a href="index.html" class="mark">Dilara Bayram<span class="dot"></span></a>
+    <div class="nav-right">
+      <a class="back" href="index.html#projects">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 18l-6-6 6-6"/></svg>
+        All work
+      </a>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg id="sunIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="doc-head">
+    <div class="wrap">
+      <div class="crumb">
+        <span>Case study</span><span class="sep">/</span><span>2025</span><span class="sep">/</span><span>solo · graph algorithms · python</span>
+      </div>
+      <h1 class="doc-title">Customer purchase patterns, <em>and the gravitational centre of the store.</em></h1>
+      <p class="doc-tagline">A year of supermarket baskets modelled as a weighted co-purchase graph, with the graph built from scratch rather than imported. The most interesting finding is not the algorithm: it is a single product that quietly distorts every result, and the case study says so directly.</p>
+
+      <dl class="doc-meta">
+        <div>
+          <dt>Role</dt>
+          <dd>Solo. Data structure, queries, analysis, write-up.</dd>
+        </div>
+        <div>
+          <dt>Year</dt>
+          <dd>2025 · personal project</dd>
+        </div>
+        <div>
+          <dt>Stack</dt>
+          <dd><div class="pills"><span class="pill">python</span><span class="pill">graph algorithms</span><span class="pill">from scratch</span><span class="pill">networkx</span><span class="pill">pytest</span></div></dd>
+        </div>
+        <div>
+          <dt>Links</dt>
+          <dd><div class="links"><a class="btn primary" href="https://github.com/dilaraBy/customer-purchasing-patterns" target="_blank" rel="noopener">GitHub repo</a></div></dd>
+        </div>
+      </dl>
+
+      <div class="metrics-row">
+        <div class="metric-card">
+          <span class="metric-val">14,963</span>
+          <span class="metric-label">Baskets analysed</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val">167</span>
+          <span class="metric-label">Unique products (nodes)</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val"><em>16%</em></span>
+          <span class="metric-label">Of baskets contain whole milk</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val">95</span>
+          <span class="metric-label">Tests · CI on 3 Python versions</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="doc-body wrap">
+    <aside class="toc" id="toc">
+      <h5>on this page</h5>
+      <a href="#problem" class="active">Problem</a>
+      <a href="#approach">Approach</a>
+      <a href="#decisions">Key decisions</a>
+      <a href="#finding">The finding</a>
+      <a href="#engineering">Engineering</a>
+      <a href="#reflection">What I'd do differently</a>
+    </aside>
+
+    <article class="prose">
+      <h2 id="problem"><span class="num">01</span>The problem</h2>
+      <p class="lead">Two questions a retailer asks constantly. What should sit next to what on the shelf, and what should we promote together? Both reduce to the same underlying question.</p>
+      <p>Which items do customers actually buy together. Not in theory, not based on category, but in practice across real baskets. The dataset I worked with had a year of supermarket transactions: 14,963 baskets, 38,765 line items, 167 unique products. Small by data-engineering standards, but big enough that intuition runs out fast and you need a structure to query.</p>
+
+      <h2 id="approach"><span class="num">02</span>Approach</h2>
+      <p>I modelled the transactions as a weighted undirected graph. Items are nodes, and a shared basket creates a weighted edge between every pair of items in it. The weight is the count of baskets that contain both products.</p>
+      <p>The reason this is a natural fit, rather than a clever one, is that the retailer's questions map directly to graph queries. Once the graph exists, most analyses are one or two operations away:</p>
+
+      <table class="query-table">
+        <thead>
+          <tr>
+            <th>Question</th>
+            <th>Graph operation</th>
+            <th class="cost">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="q">What goes with X?</td>
+            <td class="op">neighbors(X), sorted by edge weight</td>
+            <td class="cost">O(deg(X))</td>
+          </tr>
+          <tr>
+            <td class="q">What are the strongest bundles overall?</td>
+            <td class="op">top-K edges globally</td>
+            <td class="cost">O(E log K)</td>
+          </tr>
+          <tr>
+            <td class="q">Are X and Y often bought together?</td>
+            <td class="op">edge lookup</td>
+            <td class="cost">O(1)</td>
+          </tr>
+          <tr>
+            <td class="q">What's related to X within 2 hops?</td>
+            <td class="op">BFS with weight threshold</td>
+            <td class="cost">O(V + E)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <figure>
+        <img src="assets/img/copurchase/ego_network_whole_milk.png" alt="Ego network for whole milk: the 10 strongest co-purchase relationships" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        <div class="placeholder" style="display:none;">[ ego network · whole milk · 10 strongest co-purchase partners ]</div>
+        <figcaption>Fig. 1. Ego network for whole milk. The ten strongest co-purchase partners, weighted by basket count. Whole milk sits at the centre of more bundles than any other product.</figcaption>
+      </figure>
+
+      <h2 id="decisions"><span class="num">03</span>Key decisions</h2>
+      <p>Two choices shaped the rest of the project:</p>
+      <div class="dec-table">
+        <div class="dec-row">
+          <div class="k">Build the graph from scratch</div>
+          <div class="v"><b>WeightedUndirectedGraph as a pure-Python adjacency-list class, not a NetworkX wrapper.</b> The dataset is 167 nodes and 6,260 edges, which is tiny by graph standards. Using a library for the core data structure would have obscured the algorithmic work. The point of the project was to show I understand the structure, not that I can import it. NetworkX is used only for the visualisation layer, where it genuinely adds value.</div>
+        </div>
+        <div class="dec-row">
+          <div class="k">Co-purchase count, not lift</div>
+          <div class="v"><b>Edge weight is raw shared-basket count.</b> Simple, interpretable, and what most "frequently bought together" features actually use. The case study is upfront that this metric has a known failure mode (see below) and documents what lift would change if used in v2.</div>
+        </div>
+        <div class="dec-row">
+          <div class="k">CLI over notebook</div>
+          <div class="v"><b>Argparse-driven analysis commands.</b> Reproducible queries are scripts, not cells. A teammate or future me can re-run any reported number from a single command rather than scrolling through a notebook.</div>
+        </div>
+      </div>
+
+      <h2 id="finding"><span class="num">04</span>The finding</h2>
+      <p class="lead">13 of the top 20 product bundles include whole milk.</p>
+      <p>Whole milk appears in 2,363 of 14,963 baskets, around 16%, which makes it the gravitational centre of the store. Any recommender or promotional strategy built naively on this data will keep surfacing "and whole milk" as a recommendation regardless of what you query.</p>
+
+      <div class="bundles">
+        <div class="bundle"><span class="rk">01</span><span class="pair"><b>other vegetables</b> + <span class="milk">whole milk</span></span><span class="w">736</span></div>
+        <div class="bundle"><span class="rk">02</span><span class="pair">rolls/buns + <span class="milk">whole milk</span></span><span class="w">557</span></div>
+        <div class="bundle"><span class="rk">03</span><span class="pair">yogurt + <span class="milk">whole milk</span></span><span class="w">551</span></div>
+        <div class="bundle"><span class="rk">04</span><span class="pair">other vegetables + rolls/buns</span><span class="w">419</span></div>
+        <div class="bundle"><span class="rk">05</span><span class="pair">root vegetables + <span class="milk">whole milk</span></span><span class="w">481</span></div>
+      </div>
+      <p style="font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 6px;">Top edges shown for illustration. Full ranking lives in the repo.</p>
+
+      <figure>
+        <img src="assets/img/copurchase/top_30_edges.png" alt="Top 30 strongest co-purchase relationships in the dataset" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        <div class="placeholder" style="display:none;">[ top 30 edges · bar chart ranked by basket count ]</div>
+        <figcaption>Fig. 2. Top 30 co-purchase edges. Whole milk appears in the majority. The pattern is structural, not a recommendation insight.</figcaption>
+      </figure>
+
+      <div class="callout">
+        <h6>Honest limitation</h6>
+        <p>Raw co-purchase counts are biased toward popular items. Whole milk dominates partly because of its frequency, not necessarily because people intentionally pair it with everything.</p>
+        <p>The correct metric is lift: how much more than chance is this pair bought together. With lift, the whole-milk noise drops out and genuinely surprising pairs surface. The case study documents this, with a v2 plan that adds lift, confidence, customer segmentation, and a time dimension.</p>
+      </div>
+
+      <h2 id="engineering"><span class="num">05</span>Engineering</h2>
+      <p>The point was not just the analysis. The project was also a chance to ship a small Python package that behaves like real software:</p>
+      <ul>
+        <li><b>95 tests</b> covering I/O, transaction building, graph construction, BFS, analysis queries, and visualisation. Written alongside the code, not after.</li>
+        <li><b>CI on three Python versions</b> via GitHub Actions. If a change breaks on 3.10 but works on 3.12, the badge tells you before the user does.</li>
+        <li><b>Modular architecture.</b> Each concern in its own module with a small public API. The graph data structure does not know about CSV parsing, and the analysis queries do not know about plotting.</li>
+        <li><b>Input validation.</b> CSV size limits, parameter clamping on top-K and weight thresholds, sanitised filenames for user-provided output paths. Boring, necessary, the kind of thing a tool collects only when someone has actually tried to break it.</li>
+      </ul>
+
+      <figure>
+        <img src="assets/img/copurchase/global_graph_minweight_30.png" alt="Full co-purchase graph filtered to edges with weight >= 30" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        <div class="placeholder" style="display:none;">[ full co-purchase graph · edges &ge; 30 · whole milk visible as central hub ]</div>
+        <figcaption>Fig. 3. Full graph filtered to edges with weight at least 30. The central hub is whole milk. The shape of the graph is the finding.</figcaption>
+      </figure>
+
+      <h2 id="reflection"><span class="num">06</span>What I'd do differently</h2>
+      <p>The improvements I would make in a v2, in order of payoff:</p>
+      <ul>
+        <li><b>Switch the edge weight to lift, with raw counts kept as a secondary view.</b> This is the single change that removes whole-milk dominance and turns the graph into something a category manager would actually act on.</li>
+        <li><b>Confidence as a directional metric.</b> "If a customer buys X, what is the probability they also buy Y" is a different question from "how often do X and Y co-occur," and the directional asymmetry matters for shelving and bundling.</li>
+        <li><b>Customer segmentation.</b> Aggregating across all baskets hides the fact that families with infants and single shoppers have very different graphs. A segment-aware analysis is the first real product step.</li>
+        <li><b>Time dimension.</b> Seasonality is invisible in an annual aggregation. The same graph, sliced monthly, would say something useful about promotions.</li>
+      </ul>
+
+      <p>The broader thing I am taking forward: a dataset can have a gravitational centre that quietly biases every result, and a case study that pretends it does not is worse than one that names it. Recruiters and clinicians and category managers all want the same thing from this kind of work, which is honesty about where the model breaks.</p>
+    </article>
+  </section>
+
+  <section class="next">
+    <div class="wrap">
+      <h3>More work</h3>
+      <div class="next-grid">
+        <a class="next-card" href="project-diabetes.html">
+          <div class="dir">← previous</div>
+          <h4>Diabetes risk prediction</h4>
+          <p>Solo · Machine learning · CDC BRFSS, 2025</p>
+        </a>
+        <a class="next-card" href="project-mental-health.html" style="text-align: right;">
+          <div class="dir">next →</div>
+          <h4>Student mental health dashboard</h4>
+          <p>Solo · Streamlit · Python, 2025</p>
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-inner">
+    <div>© <span id="footYear">2026</span> Dilara Bayram · Coventry, UK</div>
+    <div>Built with care · HTML, CSS, a little JavaScript</div>
+  </div>
+</footer>
+
+<script>
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const sun = document.getElementById('sunIcon');
+  if (theme === 'dark') {
+    sun.innerHTML = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  } else {
+    sun.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>';
+  }
+}
+let saved = 'light';
+try { saved = (JSON.parse(localStorage.getItem('dilara_tweaks') || '{}').theme) || 'light'; } catch(e) {}
+applyTheme(saved);
+document.getElementById('themeToggle').addEventListener('click', () => {
+  saved = saved === 'dark' ? 'light' : 'dark';
+  applyTheme(saved);
+  try {
+    const s = JSON.parse(localStorage.getItem('dilara_tweaks') || '{}');
+    s.theme = saved;
+    localStorage.setItem('dilara_tweaks', JSON.stringify(s));
+  } catch(e) {}
+});
+
+// dynamic footer year
+document.getElementById('footYear').textContent = new Date().getFullYear();
+
+// TOC active
+const ids = ['problem','approach','decisions','finding','engineering','reflection'];
+const headings = ids.map(id => document.getElementById(id));
+const tocLinks = [...document.querySelectorAll('#toc a')];
+window.addEventListener('scroll', () => {
+  let current = ids[0];
+  for (const h of headings) {
+    if (h.getBoundingClientRect().top < 120) current = h.id;
+  }
+  tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current));
+}, { passive: true });
+</script>
+</body>
+</html>
