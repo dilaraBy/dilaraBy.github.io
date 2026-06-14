@@ -67,6 +67,9 @@ button { font-family: inherit; cursor: pointer; }
 .prose p { font-size: 17px; line-height: 1.7; margin: 0 0 18px; color: var(--ink); text-wrap: pretty; }
 .prose p.lead { font-family: var(--serif); font-size: 22px; line-height: 1.45; color: var(--muted); margin-bottom: 24px; }
 .prose b, .prose strong { font-weight: 500; color: var(--ink); }
+.prose figure { margin: 32px 0 36px; }
+.prose figure img { width: 100%; display: block; border: 1px solid var(--hairline); border-radius: 4px; background: var(--card); }
+.prose figure figcaption { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.04em; margin-top: 10px; }
 .callout { border: 1px solid var(--hairline); padding: 20px 22px; border-radius: 4px; background: var(--card); margin: 28px 0; }
 .callout h6 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 8px; }
 .callout p { margin: 0; font-size: 15px; }
@@ -187,6 +190,10 @@ footer { border-top: 1px solid var(--hairline); padding: 40px 0 48px; font-size:
       <p>We built the pipeline in four main stages. First, we cleaned and filtered smartphone review data into an analysis-ready corpus. Then the ABSA layer detected mentions of nine product aspects, such as battery, display, software, charging, audio, and performance, and classified the sentiment around each mention.</p>
       <p>Those aspect-sentiment predictions became monthly product-level time series. Sparse months were handled carefully with shrinkage and robust normalisation rather than pretending every product-month-aspect cell had equal evidence. Finally, the drift layer compared a lightweight LSTM autoencoder against CUSUM and PELT baselines.</p>
       <p>The dashboard wrapped the output into an analyst workflow: portfolio alerts, product pulse, root-cause evidence, and system-health views. The best version of this project is not just a notebook result. It is a monitoring product concept.</p>
+      <figure>
+        <img src="assets/img/sentineldrift-pipeline.png" alt="SentinelDrift pipeline from ingest to extraction, aggregation, changepoint detection, and explanation">
+        <figcaption>Pipeline overview: raw reviews become aspect-level sentiment signals, then time-series drift alerts with explanation evidence.</figcaption>
+      </figure>
 
       <h2 id="decisions"><span class="num">03</span>Key decisions</h2>
       <div class="dec-table">
@@ -232,6 +239,10 @@ footer { border-top: 1px solid var(--hairline); padding: 40px 0 48px; font-size:
           </tr>
         </tbody>
       </table>
+      <figure>
+        <img src="assets/img/sentineldrift-model-comparison.png" alt="Model comparison showing CUSUM with higher recall than LSTM autoencoder and faster LSTM autoencoder detection when it fires">
+        <figcaption>Model comparison: CUSUM had stronger recall; the LSTM autoencoder's edge was earlier detection when it caught an event.</figcaption>
+      </figure>
       <p>The strongest part of the project is that the result is not over-polished into a fake victory lap. Deep learning earned its place in ABSA. It did not dominate drift detection. That makes the project more credible, not less.</p>
 
       <h2 id="different"><span class="num">05</span>What we would do differently</h2>
